@@ -1,0 +1,17 @@
+[Unit]
+Description=Bettercap for pwnagotchi
+
+[Service]
+Type=simple
+# Environment=LD_PRELOAD=/usr/local/lib/libpcap.so.1
+# Environment=LD_LIBRARY_PATH=/usr/local/lib
+ExecStartPre=/usr/bin/ip link set {{ wifi_interface }} down
+ExecStartPre=/usr/sbin/iw wlan0 set monitor none
+ExecStartPre=/usr/bin/ip link set {{ wifi_interface }} up
+ExecStart=bettercap --no-colors --caplet pwnagotchi-auto -iface {{ wifi_interface }}
+Restart=always
+RestartSec=30
+
+
+[Install]
+WantedBy=multi-user.target

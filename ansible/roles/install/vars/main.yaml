@@ -1,0 +1,144 @@
+pwnagotchi:
+  hostname: "{{ lookup('env', 'PWN_HOSTNAME') | default('pwnagotchi', true) }}"
+  version: "{{ lookup('env', 'PWN_VERSION') | default('pwnagotchi-torch', true) }}"
+services:
+  enable:
+    - bettercap-pwnagotchi.service
+    - fstrim.timer
+    - pwnagotchi.service
+    - pwngrid-peer.service
+  disable:
+    - apt-daily-upgrade.service
+    - apt-daily-upgrade.timer
+    - apt-daily.service
+    - apt-daily.timer
+#    - bluetooth.service
+    - ifup@wlan0.service
+    - bettercap.service
+packages:
+  caplets:
+    source: "https://github.com/jayofelony/caplets.git"
+  bettercap:
+    source: "https://github.com/jayofelony/bettercap.git"
+    url: "https://github.com/jayofelony/bettercap/releases/download/2.32.4/bettercap-2.32.4.zip"
+    ui: "https://github.com/bettercap/ui/releases/download/v1.3.0/ui.zip"
+  pwngrid:
+    source: "https://github.com/jayofelony/pwngrid.git"
+    url: "https://github.com/jayofelony/pwngrid/releases/download/v1.10.5/pwngrid-1.10.5-aarch64.zip"
+  apt:
+    downgrade:
+      - libpcap-dev_1.9.1-4_arm64.deb
+      - libpcap0.8-dbg_1.9.1-4_arm64.deb
+      - libpcap0.8-dev_1.9.1-4_arm64.deb
+      - libpcap0.8_1.9.1-4_arm64.deb
+    hold:
+      - firmware-atheros
+      - firmware-brcm80211
+      - firmware-libertas
+      - firmware-misc-nonfree
+      - firmware-realtek
+      - libpcap-dev
+      - libpcap0.8
+      - libpcap0.8-dbg
+      - libpcap0.8-dev
+    remove:
+      - avahi-daemon
+      - dhpys-swapfile
+      - libcurl-ocaml-dev
+      - libssl-ocaml-dev
+      - nfs-common
+      - triggerhappy
+      - wpasupplicant
+    install:
+      - aircrack-ng
+      - autoconf
+      - bc
+      - bison
+      - bluez
+      - build-essential
+      - curl
+      - chrony
+      - dkms
+      - dphys-swapfile
+      - fbi
+      - flex
+      - fonts-dejavu
+      - fonts-dejavu-core
+      - fonts-dejavu-extra
+      - fonts-freefont-ttf
+      - g++
+      - gawk
+      - gcc-arm-none-eabi
+      - git
+      - hcxtools
+      - libatlas-base-dev
+      - libblas-dev
+      - libbluetooth-dev
+      - libbz2-dev
+      - libc-ares-dev
+      - libc6-dev
+      - libcap-dev
+      - libcurl-ocaml-dev
+      - libdbus-1-dev
+      - libdbus-glib-1-dev
+      - libeigen3-dev
+      - libelf-dev
+      - libffi-dev
+      - libfl-dev
+      - libfuse-dev
+      - libgdbm-dev
+      - libgmp3-dev
+      - libgstreamer1.0-0
+      - libhdf5-dev
+      - liblapack-dev
+      - libncursesw5-dev
+      - libnetfilter-queue-dev
+      - libopenblas-dev
+      - libopenjp2-7
+      - libopenmpi-dev
+      - libopenmpi3
+      - libpcap-dev
+      - libsqlite3-dev
+      - libssl-dev
+      - libssl-ocaml-dev
+      - libtiff6
+      - libtool
+      - libusb-1.0-0-dev
+      - lsof
+      - make
+      - python3-dbus
+      - python3-flask
+      - python3-flask-cors
+      - python3-flaskext.wtf
+      - python3-gast
+      - python3-pil
+      - python3-pip
+      - python3-pycryptodome
+      - python3-requests
+      - python3-scapy
+      - python3-setuptools
+      - python3-smbus
+      - python3-smbus2
+      - python3-spidev
+      # - python3-tweepy
+      - python3-werkzeug
+      - python3-yaml
+      - qpdf
+      - rsync
+      - screen
+      - tcpdump
+      - tmux
+      - byobu
+      - texinfo
+      - time
+      - tk-dev
+      - unzip
+      - vim
+      - wget
+      - wl
+      - xxd
+      - zlib1g-dev
+environment:
+  ARCHFLAGS: "-arch aarch64"
+
+wifi_interface: wlan0

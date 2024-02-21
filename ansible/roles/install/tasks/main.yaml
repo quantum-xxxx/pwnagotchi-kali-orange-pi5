@@ -1,0 +1,307 @@
+- name: install packages
+  apt:
+    name: "{{ packages.apt.install }}"
+    state: present
+    update_cache: true
+    install_recommends: false
+
+
+# Now we disable sap and a2dp, we don't use them on rpi
+- name: disable sap plugin for bluetooth.service
+  lineinfile:
+    dest: /lib/systemd/system/bluetooth.service
+    regexp: '^ExecStart=/usr/libexec/bluetooth/bluetoothd$'
+    line: 'ExecStart=/usr/libexec/bluetooth/bluetoothd --noplugin=sap,a2dp'
+    state: present
+
+- name: stop services
+  systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: stopped
+  with_items: "{{ services.enable }}"
+  ignore_errors: true
+
+
+- name: remove /etc/network/interfaces.d/wlan0-cfg
+  file:
+    name: /etc/network/interfaces.d/wlan0-cfg
+    state: absent
+
+- name: Copy NetworkManager.conf
+  copy:
+    src: NetworkManager.conf
+    dest: /etc/NetworkManager/NetworkManager.conf
+    mode: "0644"
+  notify:
+    Restart NetworkManager
+    
+###########################################
+#
+# libpcap v1.9 - build from source
+#
+###########################################
+# - name: clone libpcap v1.9 from github
+#   git:
+#     repo: 'https://github.com/the-tcpdump-group/libpcap.git'
+#     dest: /usr/local/src/libpcap
+#     version: libpcap-1.9
+#   register: libpcapgit
+
+# - name: build and install libpcap into /usr/local/lib
+#   shell: "./configure && make && make install"
+#   args:
+#     executable: /bin/bash
+#     chdir: /usr/local/src/libpcap
+#   when: libpcapgit.changed
+
+
+# - name: create symlink /usr/local/lib/libpcap.so.1.9.1
+#   file:
+#     src: /usr/local/lib/libpcap.so.1.9.1
+#     dest: /usr/local/lib/libpcap.so.0.8
+#     state: link
+
+- name: install libpcap 1.9
+  apt:
+    deb: "{{ item }}"
+    allow_downgrade: true
+  loop:
+    - http://old.kali.org/kali/pool/main/libp/libpcap/libpcap0.8_1.9.1-4_arm64.deb
+    - http://old.kali.org/kali/pool/main/libp/libpcap/libpcap-dev_1.9.1-4_arm64.deb
+    - http://old.kali.org/kali/pool/main/libp/libpcap/libpcap0.8-dev_1.9.1-4_arm64.deb
+
+
+# install latest hcxtools
+
+- name: clone hcxtools
+  git:
+    repo: https://github.com/ZerBea/hcxtools.git
+    dest: /usr/local/src/hcxtools
+  register: hcxtoolsgit
+
+- name: install hcxtools
+  shell: "make && make install"
+  args:
+    executable: /bin/bash
+    chdir: /usr/local/src/hcxtools
+  when: hcxtoolsgit.changed
+
+- name: Create custom plugin directory
+  file:
+    path: /usr/local/share/pwnagotchi/custom-plugins/
+    state: directory
+
+- name: Create custom config directory
+  file:
+    path: /etc/pwnagotchi/conf.d/
+    state: directory
+
+- name: clone pwnagotchi repository
+  git:
+    repo: https://github.com/jayofelony/pwnagotchi-bookworm.git
+    dest: /usr/local/src/pwnagotchi
+  register: pwnagotchigit
+
+- name: build pwnagotchi wheel
+  command: "pip3 install . --no-cache-dir --break-system-packages"
+  args:
+    chdir: /usr/local/src/pwnagotchi
+  when: pwnagotchigit.changed
+
+
+- name: create /usr/local/share/pwnagotchi/ folder
+  file:
+    path: /usr/local/share/pwnagotchi/
+    state: directory
+    mode: "0755"
+
+- name: Install go-1.21
+  unarchive:
+    src: https://go.dev/dl/go1.21.5.linux-arm64.tar.gz
+    dest: /usr/local
+    remote_src: true
+    creates: /usr/local/go
+  register: golang
+
+- name: download pwngrid
+  git:
+    repo: "{{ packages.pwngrid.source }}"
+    dest: /usr/local/src/pwngrid
+    force: true
+  register: pwngridgit
+
+- name: install pwngrid
+  shell: "export GOPATH=$HOME/go && export PATH=/usr/local/go/bin:$PATH:$GOPATH/bin && go mod tidy && make && make install"
+  args:
+    executable: /bin/bash
+    chdir: /usr/local/src/pwngrid
+  when: pwngridgit.changed
+
+
+- name: replace /etc/systemd/system/pwngrid-peer.service
+  tempfile:
+
+- name: replace pwngrid-peer.service
+  template:
+    src: pwngrid-peer.service.j2
+    dest: /etc/systemd/system/pwngrid-peer.service
+    mode: "0644"
+  notify:
+    - Systemd reload
+    - Restart pwngrid-peer
+
+
+- name: download bettercap
+  git:
+    repo: "{{ packages.bettercap.source }}"
+    dest: /usr/local/src/bettercap
+    force: true
+
+- name: install bettercap 2.32.4
+  shell: "export GOPATH=$HOME/go && export PATH=/usr/local/go/bin:$PATH:$GOPATH/bin && go mod tidy && make && make install"
+  args:
+    executable: /bin/bash
+    chdir: /usr/local/src/bettercap
+
+- name: clone bettercap caplets
+  git:
+    repo: "{{ packages.caplets.source }}"
+    dest: /tmp/caplets
+  register: capletsgit
+
+- name: install bettercap caplets
+  make:
+    chdir: /tmp/caplets
+    target: install
+  when: capletsgit.changed
+
+- name: download and install bettercap ui
+  unarchive:
+    src: "{{ packages.bettercap.ui }}"
+    dest: /usr/local/share/bettercap/
+    remote_src: true
+    mode: "0755"
+    creates: /usr/local/share/bettercap/ui
+
+- name: copy caplet
+  template:
+    src: pwnagotchi.cap.j2
+    dest: /usr/local/share/bettercap/caplets/pwnagotchi-{{ item }}.cap
+    mode: "0644"
+  loop:
+    - manual
+    - auto
+  notify:
+    - Restart bettercap-pwnagotchi
+
+- name: create /etc/pwnagotchi folder
+  file:
+    path: /etc/pwnagotchi
+    state: directory
+    mode: "0755"
+
+- name: create log folder
+  file:
+    path: /home/{{ pwn_user }}/logs
+    state: directory
+    mode: "0755"
+
+- name: check if user configuration exists
+  stat:
+    path: /etc/pwnagotchi/config.toml
+  register: user_config
+
+- name: create /etc/pwnagotchi/config.toml
+  copy:
+    dest: /etc/pwnagotchi/config.toml
+    mode: "0644"
+    content: |
+      # Add your configuration overrides on this file any configuration changes done to default.toml will be lost!
+      # Example:
+      # ui.display.enabled = true
+      # ui.display.type = "waveshare_2"
+  when: not user_config.stat.exists
+
+# chrony
+- name: copy chrony.conf
+  copy:
+    src: chrony.conf
+    dest: /etc/chrony/chrony.conf
+    mode: '0644'
+  notify: Restart chronyd
+
+- name: Copy bettercap service
+  template:
+    src: bettercap-pwnagotchi.service.j2
+    dest: /etc/systemd/system/bettercap-pwnagotchi.service
+    mode: "0644"
+  notify:
+    - Systemd reload
+    - Restart bettercap-pwnagotchi
+
+- name: disable unnecessary services
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  with_items: "{{ services.disable }}"
+
+- name: enable services
+  systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  with_items: "{{ services.enable }}"
+  register: enabled
+
+- name: restart services
+  systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: restarted
+  with_items: "{{ services.enable }}"
+
+
+- name: make /root readable, becauase that's where all the files are
+  file:
+    path: /root
+    mode: '0755'
+
+- name: remove dependencies that are no longer required
+  apt:
+    autoremove: true
+
+- name: Check that ~/.zshrc exists
+  stat:
+    path: /home/{{ pwn_user }}/.zshrc
+  register: zshrc
+
+
+- block:
+  - name: Add pwnlog alias
+    lineinfile:
+      dest: /home/{{ pwn_user }}/.zshrc
+      line: "\nalias pwnlog='tail -f -n300 /home/pi/logs/pwn*.log | sed --unbuffered \"s/,[[:digit:]]\\{3\\}\\]//g\" | cut -d \" \" -f 2-'"
+      insertafter: EOF
+  - name: Add pwnver alias
+    lineinfile:
+      dest: /home/{{ pwn_user }}/.zshrc
+      line: "\nalias pwnver='python3 -c \"import pwnagotchi as p; print(p.__version__)\"'"
+      insertafter: EOF
+
+  - name: Add pwnkill alias to restart pwnagotchi with a signal
+    lineinfile:
+      dest: /home/{{ pwn_user }}/.zshrc
+      line: "\nalias pwnkill='sudo killall -USR1 pwnagotchi'"
+      insertafter: EOF
+
+  - name: Update .bashrc for go-1.21
+    blockinfile:
+      dest: /home/{{ pwn_user }}/.zshrc
+      state: present
+      block: |
+        export GOPATH=$HOME/go
+        export PATH=/usr/local/go/bin:$PATH:$GOPATH/bin
+  when:
+    - zshrc.stat.exists

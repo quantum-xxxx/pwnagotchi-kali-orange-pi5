@@ -1,0 +1,23 @@
+- name: Systemd reload
+  systemd:
+    daemon_reload: true
+
+- name: Restart bettercap-pwnagotchi
+  service:
+    name: bettercap-pwnagotchi.service
+    state: restarted
+
+- name: Restart chronyd
+  service:
+    name: chronyd.service
+    state: restarted
+
+- name: Restart pwngrid-peer
+  service:
+    name: pwngrid-peer.service
+    state: restarted
+
+- name: Restart NetworkManager
+  service:
+    name: NetworkManager.service
+    state: restarted
